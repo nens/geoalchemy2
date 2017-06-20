@@ -1,5 +1,5 @@
 import binascii
-from geoalchemy2.compat import PY3
+from .compat import PY3
 
 try:
     from sqlalchemy.sql import functions

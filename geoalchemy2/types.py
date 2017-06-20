@@ -7,13 +7,67 @@ Reference
 ---------
 """
 
+from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.types import UserDefinedType, Integer
 from sqlalchemy.sql import func
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql.base import ischema_names
+from sqlalchemy.sql import expression
+from sqlalchemy.sql import functions
+
 
 from .comparator import BaseComparator, Comparator
 from .elements import WKBElement, WKTElement, RasterElement, CompositeElement
+
+
+class ST_GeomFromEWKT(functions.Function):
+    name = "ST_GeomFromEWKT"
+    identifier = "ST_GeomFromEWKT"
+
+    def __init__(self, bind_parameters, *args, **kwargs):
+        functions.Function.__init__(self, self.name, bind_parameters, *args, **kwargs)
+
+
+@compiles(ST_GeomFromEWKT, 'default')
+def visit_ST_GeomFromEWKT(element, compiler, **kwargs):
+
+    name = "ST_GeomFromEWKT%(expr)s"
+
+    expression = ".".join(list(element.packagenames) + [name]) % \
+            {'expr': compiler.function_argspec(element, **kwargs)}
+    return expression
+
+
+@compiles(ST_GeomFromEWKT, 'sqlite')
+def visit_ST_GeomFromEWKT(element, compiler, **kwargs):
+
+    name = "GeomFromEWKT%(expr)s"
+
+    expression = ".".join(list(element.packagenames) + [name]) % \
+            {'expr': compiler.function_argspec(element, **kwargs)}
+    return expression
+
+
+class ST_AsEWKB(functions.Function):
+    name = "ST_AsEWKB"
+    identifier = "ST_AsEWKB"
+
+    def __init__(self, bind_parameters, *args, **kwargs):
+        functions.Function.__init__(self, self.name, bind_parameters, *args, **kwargs)
+
+
+@compiles(ST_AsEWKB, 'default')
+def visit_ST_AsEWKB_def(element, compiler, **kwargs):
+
+    # compiler.visit_function(element, **kwargs)
+    return "ST_AsEWKB(%s)" % compiler.process(element.clauses)
+
+
+@compiles(ST_AsEWKB, 'sqlite')
+def visit_ST_AsEWKB(element, compiler, **kwargs):
+
+    # compiler.visit_function(element, **kwargs)
+    return "AsEWKB(%s)" % compiler.process(element.clauses)
 
 
 class _GISType(UserDefinedType):
@@ -115,7 +169,7 @@ class _GISType(UserDefinedType):
         return process
 
     def bind_expression(self, bindvalue):
-        return getattr(func, self.from_text)(bindvalue, type_=self)
+        return getattr(func, 'GeomFromEWKT')(bindvalue, type_=self) # self.from_text
 
     def bind_processor(self, dialect):
         def process(bindvalue):
@@ -142,14 +196,26 @@ class Geometry(_GISType):
     name = 'geometry'
     """ Type name used for defining geometry columns in ``CREATE TABLE``. """
 
-    from_text = 'ST_GeomFromEWKT'
+    from_text = 'GeomFromEWKT'
     """ The "from text" geometry constructor. Used by the parent class'
         ``bind_expression`` method. """
 
-    as_binary = 'ST_AsEWKB'
+    as_binary = 'AsEWKT'
     """ The "as binary" function to use. Used by the parent class'
         ``column_expression`` method. """
 
+    def column_expression(self, col):
+        return ST_AsEWKB(col, type_=self)
+
+    def bind_expression(self, bindvalue):
+        return ST_GeomFromEWKT(bindvalue, type_=self)
+
+
+
+spatialite_func_mapping = {
+    'ST_AsEWKB': 'AsEWKB',
+    'ST_GeomFromEWKT': 'GeomFromEWKT',
+}
 
 class Geography(_GISType):
     """

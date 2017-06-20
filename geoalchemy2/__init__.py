@@ -39,7 +39,7 @@ def _setup_ddl_event_listeners():
             # Note: Geography and PostGIS >= 2.0 don't need this
             gis_cols = [c for c in table.c if
                         isinstance(c.type, Geometry) and
-                        c.type.management is True]
+                        (c.type.management is True or bind.dialect.name == 'sqlite')]
 
             # Find all other columns that are not managed Geometries
             regular_cols = [x for x in table.c if x not in gis_cols]
@@ -56,6 +56,19 @@ def _setup_ddl_event_listeners():
 
             if event == 'before-drop':
                 # Drop the managed Geometry columns with DropGeometryColumn()
+                if bind.dialect.name == 'sqlite':
+                    for c in gis_cols:
+                        if c.type.spatial_index:
+                            bind.execute(select(
+                                [func.DisableSpatialIndex(table.name, c.name)]).execution_options(
+                                autocommit=True))
+                            bind.execute("DROP TABLE idx_%s_%s" % (table.name, c.name))
+
+                        bind.execute(select(
+                            [func.DiscardGeometryColumn(table.name, c.name)]).execution_options(
+                            autocommit=True))
+                    return
+
                 table_schema = table.schema or 'public'
                 for c in gis_cols:
                     stmt = select([
@@ -67,6 +80,30 @@ def _setup_ddl_event_listeners():
         elif event == 'after-create':
             # Restore original column list including managed Geometry columns
             table.columns = table.info.pop('_saved_columns')
+
+            if bind.dialect.name == 'sqlite':
+                for c in table.c:
+                    # Add the managed Geometry columns with AddGeometryColumn()
+                    if isinstance(c.type, Geometry):
+                        stmt = select([
+                            func.AddGeometryColumn(
+                                table.name,
+                                c.name,
+                                c.type.srid,
+                                c.type.geometry_type,
+                                c.type.dimension,
+                                0 if c.nullable else 1
+                            )])
+                        stmt = stmt.execution_options(autocommit=True)
+                        bind.execute(stmt)
+
+                        if c.type.spatial_index:
+                            bind.execute(
+                                "SELECT CreateSpatialIndex('%s', '%s')" % (table.name, c.name))
+                            bind.execute("VACUUM %s" % table.name)
+
+                return
+            # else postgis
 
             table_schema = table.schema or 'public'
             for c in table.c:
@@ -105,4 +142,6 @@ def _setup_ddl_event_listeners():
         elif event == 'after-drop':
             # Restore original column list including managed Geometry columns
             table.columns = table.info.pop('_saved_columns')
+# todo: add check or warning to prevent double initialisation of listeners (happens when
+# package is imported in different ways
 _setup_ddl_event_listeners()

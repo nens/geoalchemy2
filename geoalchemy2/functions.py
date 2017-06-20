@@ -51,6 +51,8 @@ Reference
 """
 
 from sqlalchemy.sql import functions
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql import compiler
 
 from . import types
 
@@ -150,29 +152,31 @@ _FUNCTIONS = [
      'Return the Well-Known Binary (WKB) representation of the geometry/'
      'geography without SRID meta data.'),
 
-    ('ST_AsEWKB', None,
-     'Return the Well-Known Binary (WKB) representation of the geometry/'
-     'geography with SRID meta data.'),
-
-    ('ST_AsGeoJSON', None, 'Return the geometry as a GeoJSON element.'),
-
-    ('ST_AsGML', None, 'Return the geometry as a GML version 2 or 3 element.'),
-
-    ('ST_AsKML', None,
-     'Return the geometry as a KML element. Several variants. Default '
-     'version=2, default precision=15'),
-
-    ('ST_AsSVG', None,
-     'Returns a Geometry in SVG path data given a geometry or geography '
-     'object.'),
+    # following functions has a different name under spatialite (without 'ST_'),
+    # todo: find out how to differ function behavior under qgis and spatialite
+    # ('ST_AsEWKB', None,
+    #  'Return the Well-Known Binary (WKB) representation of the geometry/'
+    #  'geography with SRID meta data.'),
+    #
+    # ('ST_AsGeoJSON', None, 'Return the geometry as a GeoJSON element.'),
+    #
+    # ('ST_AsGML', None, 'Return the geometry as a GML version 2 or 3 element.'),
+    #
+    # ('ST_AsKML', None,
+    #  'Return the geometry as a KML element. Several variants. Default '
+    #  'version=2, default precision=15'),
+    #
+    # ('ST_AsSVG', None,
+    #  'Returns a Geometry in SVG path data given a geometry or geography '
+    #  'object.'),
 
     ('ST_AsText', None,
      'Return the Well-Known Text (WKT) representation of the geometry/'
      'geography without SRID metadata.'),
 
-    ('ST_AsEWKT', None,
-     'Return the Well-Known Text (WKT) representation of the geometry/'
-     'geography with SRID metadata.'),
+    # ('ST_AsEWKT', None,
+    #  'Return the Well-Known Text (WKT) representation of the geometry/'
+    #  'geography with SRID metadata.'),
 
     #
     # Spatial Relationships and Measurements
@@ -191,10 +195,11 @@ _FUNCTIONS = [
      'A, and at least one point of the interior of B lies in the interior '
      'of A.'),
 
-    ('ST_ContainsProperly', None,
-     'Returns ``True`` if B intersects the interior of A but not the boundary '
-     '(or exterior). A does not contain properly itself, but does contain '
-     'itself.'),
+    # not supported by spatialite
+    # ('ST_ContainsProperly', None,
+    #  'Returns ``True`` if B intersects the interior of A but not the boundary '
+    #  '(or exterior). A does not contain properly itself, but does contain '
+    #  'itself.'),
 
     ('ST_Covers', None,
      'Returns ``True`` if no point in Geometry B is outside Geometry A'),
@@ -217,22 +222,25 @@ _FUNCTIONS = [
      'geography type defaults to return spheroidal minimum distance between '
      'two geographies in meters.'),
 
-    ('ST_Distance_Sphere', None,
-     'Returns minimum distance in meters between two lon/lat geometries. Uses '
-     'a spherical earth and radius of 6370986 meters. Faster than '
-     '``ST_Distance_Spheroid``, but less accurate. PostGIS versions '
-     'prior to 1.5 only implemented for points.'),
-
-    ('ST_DFullyWithin', None,
-     'Returns ``True`` if all of the geometries are within the specified '
-     'distance of one another'),
-
-    ('ST_DWithin', None,
-     'Returns ``True`` if the geometries are within the specified distance of '
-     'one another. For geometry units are in those of spatial reference and '
-     'for geography units are in meters and measurement is defaulted to '
-     '``use_spheroid=True`` (measure around spheroid), for faster check, '
-     '``use_spheroid=False`` to measure along sphere.'),
+    # available in spatialite when providing third parameter use_ellipsoid=True
+    # ('ST_Distance_Sphere', None,
+    #  'Returns minimum distance in meters between two lon/lat geometries. Uses '
+    #  'a spherical earth and radius of 6370986 meters. Faster than '
+    #  '``ST_Distance_Spheroid``, but less accurate. PostGIS versions '
+    #  'prior to 1.5 only implemented for points.'),
+    #
+    # not supported by spatialite
+    # ('ST_DFullyWithin', None,
+    #  'Returns ``True`` if all of the geometries are within the specified '
+    #  'distance of one another'),
+    #
+    # available in spatialite under PtDistWithin
+    # ('ST_DWithin', None,
+    #  'Returns ``True`` if the geometries are within the specified distance of '
+    #  'one another. For geometry units are in those of spatial reference and '
+    #  'for geography units are in meters and measurement is defaulted to '
+    #  '``use_spheroid=True`` (measure around spheroid), for faster check, '
+    #  '``use_spheroid=False`` to measure along sphere.'),
 
     ('ST_Equals', None,
      'Returns ``True`` if the given geometries represent the same geometry. '
@@ -249,9 +257,10 @@ _FUNCTIONS = [
      'multilinestring. geometry are in units of spatial reference and '
      'geography are in meters (default spheroid)'),
 
-    ('ST_OrderingEquals', None,
-     'Returns ``True`` if the given geometries represent the same geometry '
-     'and points are in the same directional order.'),
+    # not supported by spatialite
+    # ('ST_OrderingEquals', None,
+    #  'Returns ``True`` if the given geometries represent the same geometry '
+    #  'and points are in the same directional order.'),
 
     ('ST_Overlaps', None,
      'Returns ``True`` if the Geometries share space, are of the same '
@@ -297,13 +306,14 @@ _FUNCTIONS = [
      'Returns a geometry that represents that part of geometry A that does '
      'not intersect with geometry B.'),
 
-    ('ST_Dump', types.GeometryDump,
-     'Returns a set of geometry_dump (geom,path) rows, that make up a '
-     'geometry g1.'),
-
-    ('ST_DumpPoints', types.GeometryDump,
-     'Returns a set of geometry_dump (geom,path) rows of all points that '
-     'make up a geometry.'),
+    # not supported by spatialite
+    # ('ST_Dump', types.GeometryDump,
+    #  'Returns a set of geometry_dump (geom,path) rows, that make up a '
+    #  'geometry g1.'),
+    #
+    # ('ST_DumpPoints', types.GeometryDump,
+    #  'Returns a set of geometry_dump (geom,path) rows of all points that '
+    #  'make up a geometry.'),
 
     ('ST_Intersection', types.Geometry,
      'Returns a geometry that represents the shared portion of geomA and '
@@ -321,6 +331,7 @@ _FUNCTIONS = [
     #
     # Raster Constructors
     #
+    # raster not supported by spatialite
 
     ('ST_AsRaster', types.Raster,
      ('Converts a PostGIS geometry to a PostGIS raster.', 'RT_ST_AsRaster')),
